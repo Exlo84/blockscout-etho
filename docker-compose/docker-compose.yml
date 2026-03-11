@@ -1,0 +1,104 @@
+version: '3.9'
+
+services:
+  redis-db:
+    extends:
+      file: ./services/redis.yml
+      service: redis-db
+
+  db-init:
+    extends:
+      file: ./services/db.yml
+      service: db-init
+
+  db:
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    extends:
+      file: ./services/db.yml
+      service: db
+
+  backend:
+    depends_on:
+      - db
+      - redis-db
+    extends:
+      file: ./services/backend.yml
+      service: backend
+    pull_policy: never
+    build:
+      context: ..
+      network: host
+      dockerfile: ./docker/Dockerfile
+      args:
+        RELEASE_VERSION: 10.0.2
+    links:
+      - db:database
+    environment:
+        ETHEREUM_JSONRPC_HTTP_URL: http://172.17.0.1:8448/
+        ETHEREUM_JSONRPC_TRACE_URL: http://172.17.0.1:8448/
+        # WS removed: geth-etho has no --ws flag, use HTTP polling instead
+        CHAIN_ID: '1313114'
+
+  nft_media_handler:
+    depends_on:
+      - backend
+    extends:
+      file: ./services/nft_media_handler.yml
+      service: nft_media_handler
+    pull_policy: never
+    build:
+      context: ..
+      network: host
+      dockerfile: ./docker/Dockerfile
+      args:
+        RELEASE_VERSION: 10.0.2
+
+  visualizer:
+    extends:
+      file: ./services/visualizer.yml
+      service: visualizer
+
+  sig-provider:
+    extends:
+      file: ./services/sig-provider.yml
+      service: sig-provider
+
+  frontend:
+    depends_on:
+      - backend
+    extends:
+      file: ./services/frontend.yml
+      service: frontend
+    pull_policy: never
+    build:
+      context: ${FRONTEND_DIR:-../frontend}
+      network: host
+      dockerfile: Dockerfile.etho
+    environment:
+      NEXT_PUBLIC_API_BASE_PATH: /
+
+  stats-db-init:
+    extends:
+      file: ./services/stats.yml
+      service: stats-db-init
+
+  stats-db:
+    depends_on:
+      stats-db-init:
+        condition: service_completed_successfully
+    extends:
+      file: ./services/stats.yml
+      service: stats-db
+
+  stats:
+    depends_on:
+      - stats-db
+      - backend
+    extends:
+      file: ./services/stats.yml
+      service: stats
+
+  # user-ops-indexer disabled: ETHO has no ERC-4337 bundler endpoint
+
