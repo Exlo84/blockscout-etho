@@ -15,5 +15,6 @@ services:
     volumes:
       - ./logs/:/app/logs/
       - ./dets/:/app/dets/
+      - ./chain_spec.json:/app/chain_spec.json:ro
     ports:
       - '4000:4000'
